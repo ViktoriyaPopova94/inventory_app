@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление инвентарем</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        header {
+            background-color: #4b2e1d; /* Глубокий коричневый цвет */
+            color: white;
+            text-align: center;
+            padding: 10px;
+        }
+        .container {
+            width: 90%;
+            margin: 20px auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #4b2e1d; /* Коричневый */
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4b2e1d; /* Коричневый */
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button:hover {
+            background-color: #3a2416;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #4b2e1d; /* Коричневый */
+            color: white;
+        }
+        .expandable {
+            cursor: pointer;
+            background-color: #f9f9f9;
+        }
+        .details {
+            display: none;
+        }
+        @media (max-width: 600px) {
+            .container {
+                width: 100%;
+                padding: 10px;
+            }
+            button {
+                padding: 8px;
+                font-size: 14px;
+            }
+            input, textarea, select {
+                padding: 6px;
+                font-size: 14px;
+            }
+            th, td {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Управление инвентарем</h1>
+    </header>
+
+    <div class="container">
+        <h2>Добавить/Редактировать имущество</h2>
+        <label for="name">Название:</label>
+        <input type="text" id="name" placeholder="Введите название">
+
+        <label for="inventoryNumbers">Инвентарные номера (через запятую):</label>
+        <textarea id="inventoryNumbers" placeholder="Введите инвентарные номера"></textarea>
+
+        <label for="quantity">Количество:</label>
+        <input type="number" id="quantity" placeholder="Введите количество">
+
+        <label for="rooms">Кабинеты (через запятую):</label>
+        <textarea id="rooms" placeholder="Введите номера кабинетов"></textarea>
+
+        <button id="addItemBtn">Добавить</button>
+
+        <h2>Список имущества</h2>
+        <label for="filterRoom">Фильтр по кабинету:</label>
+        <select id="filterRoom">
+            <option value="">Все кабинеты</option>
+        </select>
+
+        <table id="inventoryTable">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Инвентарные номера</th>
+                    <th>Количество</th>
+                    <th>Кабинет</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Данные будут добавляться сюда -->
+            </tbody>
+        </table>
+
+        <button id="exportBtn">Экспортировать в CSV</button>
+    </div>
+
+    <script>
+        const addItemBtn = document.getElementById('addItemBtn');
+        const inventoryTable = document.getElementById('inventoryTable').querySelector('tbody');
+        const filterRoom = document.getElementById('filterRoom');
+        let inventoryData = JSON.parse(localStorage.getItem('inventoryData')) || [];
+        let editingIndex = null; // Индекс редактируемого элемента
+
+        // Загрузка данных при открытии страницы
+        window.onload = function() {
+            if (inventoryData.length > 0) {
+                inventoryData.forEach((item, index) => addRowToTable(item, index));
+                updateRoomFilter();
+            }
+        };
+
+        // Добавить или обновить имущество
+        addItemBtn.addEventListener('click', () => {
+            const name = document.getElementById('name').value;
+            const inventoryNumbers = document.getElementById('inventoryNumbers').value.split(',').map(num => num.trim());
+            const quantity = document.getElementById('quantity').value;
+            const rooms = document.getElementById('rooms').value.split(',').map(room => room.trim());
+
+            if (!name || !inventoryNumbers.length || !quantity || !rooms.length) {
+                alert('Пожалуйста, заполните все поля.');
+                return;
+            }
+
+            if (editingIndex === null) {
+                // Добавление новых элементов
+                rooms.forEach(room => {
+                    const item = {
+                        name,
+                        inventoryNumbers,
+                        quantity,
+                        room
+                    };
+
+                    inventoryData.push(item);
+                });
+            } else {
+                // Обновление существующего элемента
+                const item = {
+                    name,
+                    inventoryNumbers,
+                    quantity,
+                    room: rooms[0] // Обновляем только первый кабинет, если их несколько
+                };
+
+                inventoryData[editingIndex] = item;
+                editingIndex = null;
+            }
+
+            updateTable();
+            updateRoomFilter();
+            saveToLocalStorage();
+            clearInputs();
+        });
+
+        // Добавить строку в таблицу
+        function addRowToTable(item, index) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${item.name}</td>
+                <td>${item.inventoryNumbers.join(', ')}</td>
+                <td>${item.quantity}</td>
+                <td>${item.room}</td>
+                <td>
+                    <button onclick="editItem(${index})">Редактировать</button>
+                    <button onclick="deleteItem(${index})">Удалить</button>
+                </td>
+            `;
+            inventoryTable.appendChild(row);
+        }
+
+        // Очистить поля ввода
+        function clearInputs() {
+            document.getElementById('name').value = '';
+            document.getElementById('inventoryNumbers').value = '';
+            document.getElementById('quantity').value = '';
+            document.getElementById('rooms').value = '';
+        }
+
+        // Обновить таблицу
+        function updateTable() {
+            inventoryTable.innerHTML = '';
+            inventoryData.forEach((item, index) => addRowToTable(item, index));
+        }
+
+        // Обновить фильтр кабинетов
+        function updateRoomFilter() {
+            const rooms = [...new Set(inventoryData.map(item => item.room))];
+            filterRoom.innerHTML = '<option value="">Все кабинеты</option>';
+            rooms.forEach(room => {
+                filterRoom.innerHTML += `<option value="${room}">${room}</option>`;
+            });
+        }
+
+        // Функция редактирования
+        function editItem(index) {
+            const item = inventoryData[index];
+            document.getElementById('name').value = item.name;
+            document.getElementById('inventoryNumbers').value = item.inventoryNumbers.join(', ');
+            document.getElementById('quantity').value = item.quantity;
+            document.getElementById('rooms').value = item.room;
+            editingIndex = index; // Устанавливаем индекс редактируемого элемента
+        }
+
+        // Функция удаления
+        function deleteItem(index) {
+            inventoryData.splice(index, 1);
+            saveToLocalStorage();
+            updateTable();
+            updateRoomFilter();
+        }
+
+        // Экспорт данных в CSV
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const csvContent = 'data:text/csv;charset=utf-8,' 
+                + ['Название,Инвентарные номера,Количество,Кабинет']
+                    .concat(inventoryData.map(item => 
+                        `${item.name},"${item.inventoryNumbers.join(', ')}",${item.quantity},${item.room}`
+                    ))
+                    .join('\n');
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement('a');
+            link.setAttribute('href', encodedUri);
+            link.setAttribute('download', 'inventory.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // Сохранить данные в LocalStorage
+        function saveToLocalStorage() {
+            localStorage.setItem('inventoryData', JSON.stringify(inventoryData));
+        }
+    </script>
+</body>
+</html>

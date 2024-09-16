@@ -1,0 +1,37 @@
+// app.js
+
+document.getElementById('itemForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const name = document.getElementById('name').value;
+  const inventoryNumber = document.getElementById('inventoryNumber').value;
+  const quantity = parseInt(document.getElementById('quantity').value, 10);
+
+  try {
+    for (let i = 0; i < quantity; i++) {
+      await addItem({ name, inventoryNumber: `${inventoryNumber}-${i + 1}` });
+    }
+    alert('Предметы добавлены.');
+    loadItems();
+  } catch (error) {
+    console.error(error);
+  }
+});
+
+async function loadItems() {
+  try {
+    const items = await getItems();
+    const itemList = document.getElementById('itemList');
+    itemList.innerHTML = '';
+
+    items.forEach(item => {
+      const listItem = document.createElement('li');
+      listItem.textContent = `${item.name} - ${item.inventoryNumber}`;
+      itemList.appendChild(listItem);
+    });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+loadItems();
